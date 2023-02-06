@@ -24,6 +24,9 @@
 
 #include "uusb.h"
 #include "ccid.h"
+#include "util.h"
+
+#undef USB_DEBUG
 
 /*
  * Descriptor types
@@ -138,6 +141,14 @@ extern uusb_dev_t *	usb_open_type(const uusb_type_t *);
 /* Alternative idea: find device(s) that have a CCID descriptor */
 
 extern bool		uusb_parse_descriptors(uusb_dev_t *dev, const unsigned char *data, size_t len);
+
+
+#ifdef USB_DEBUG
+# define usb_debug		debug2
+#else
+# define usb_debug(fmt ...)	do { } while (0)
+#endif
+
 
 #endif /* UUSB_IMPL_H */
 

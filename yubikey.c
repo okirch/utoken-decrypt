@@ -315,7 +315,7 @@ static buffer_t *
 yubikey_decipher(ifd_card_t *card, buffer_t *ciphertext)
 {
 	unsigned int key = 0x9a;	/* for now, assume we're always using slot 9a. */
-	unsigned int in_len, key_len;
+	unsigned int in_len;
 	uint8_t algorithm;
 	buffer_t *data, *apdu = NULL, *rapdu = NULL, *cleartext = NULL;
 
@@ -330,12 +330,10 @@ yubikey_decipher(ifd_card_t *card, buffer_t *ciphertext)
 	switch (in_len) {
 	case 128:
 		algorithm = YKPIV_ALGO_RSA1024;
-		key_len = 128;
 		break;
 
 	case 256:
 		algorithm = YKPIV_ALGO_RSA2048;
-		key_len = 256;
 		break;
 
 	default:

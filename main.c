@@ -32,10 +32,12 @@ static struct option	options[] = {
 	{ "device",	required_argument,	NULL,	'D' },
 	{ "type",	required_argument,	NULL,	'T' },
 	{ "pin",	required_argument,	NULL,	'p' },
+	{ "debug",	no_argument,		NULL,	'd' },
+	{ "help",	no_argument,		NULL,	'h' },
 	{ NULL }
 };
 
-unsigned int	opt_debug = 2;
+unsigned int	opt_debug = 0;
 
 static buffer_t *read_data(const char *filename);
 static bool	doit(uusb_dev_t *dev, const char *pin, buffer_t *secret);
@@ -50,8 +52,16 @@ main(int argc, char **argv)
 	uusb_dev_t *dev;
 	int c;
 
-	while ((c = getopt_long(argc, argv, "D:T:p:", options, NULL)) != -1) {
+	while ((c = getopt_long(argc, argv, "dhD:T:p:", options, NULL)) != -1) {
 		switch (c) {
+		case 'h':
+			printf("Sorry, no help message. Please refer to the README.\n");
+			exit(0);
+
+		case 'd':
+			opt_debug++;
+			break;
+
 		case 'D':
 			opt_device = optarg;
 			break;
@@ -65,7 +75,7 @@ main(int argc, char **argv)
 			break;
 
 		default:
-			fprintf(stderr, "Unknown option %c\n", c);
+			error("Unknown option %c\n", c);
 			return 1;
 		}
 	}
@@ -89,7 +99,7 @@ main(int argc, char **argv)
 	}
 
 	if (dev == NULL) {
-		fprintf(stderr, "Did not find USB device\n");
+		error("Did not find USB device\n");
 		return 1;
 	}
 
@@ -101,7 +111,7 @@ main(int argc, char **argv)
 static buffer_t *
 read_data(const char *filename)
 {
-	infomsg("Reading secret from %s\n", filename);
+	infomsg("Reading data from \"%s\"\n", filename);
 	return buffer_read_file(filename, 0);
 }
 
@@ -113,7 +123,7 @@ doit(uusb_dev_t *dev, const char *pin, buffer_t *ciphertext)
 	buffer_t *cleartext;
 
 	if (!(reader = ccid_reader_create(dev))) {
-		fprintf(stderr, "Unable to create reader for USB device\n");
+		error("Unable to create reader for USB device\n");
 		return false;
 	}
 

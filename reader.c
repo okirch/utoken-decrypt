@@ -91,12 +91,12 @@ ccid_reader_create(uusb_dev_t *dev)
 	ccid_reader_t *reader;
 
 	if (!uusb_dev_select_ccid_interface(dev, &ccid)) {
-		fprintf(stderr, "USB device does not have a CCID descriptor\n");
+		error("USB device does not have a CCID descriptor\n");
 		return NULL;
 	}
 
 	if ((ccid->dwProtocols & (CCID_PROTO_T0_MASK | CCID_PROTO_T1_MASK)) == 0) {
-		fprintf(stderr, "CCID device does not speak any protocol we understand\n");
+		error("CCID device does not speak any protocol we understand\n");
 		return NULL;
 	}
 
@@ -409,7 +409,7 @@ ccid_reader_select_slot(ccid_reader_t *reader, unsigned int slot)
 		return true;
 
 	if (!ccid_get_slot_status(reader, slot, &status)) {
-		fprintf(stderr, "Cannot get slot status\n");
+		error("Cannot get slot status\n");
 		return false;
 	}
 
@@ -418,7 +418,7 @@ ccid_reader_select_slot(ccid_reader_t *reader, unsigned int slot)
 		return false;
 	}
 
-	infomsg("Slot status 0x%x\n", status);
+	debug("CCID reader reports card status 0x%x for slot %u\n", status, slot);
 	reader->current_slot = slot;
 
 	return true;
@@ -444,7 +444,7 @@ ccid_reader_identify_card(ccid_reader_t *reader, unsigned int slot)
 		return NULL;
 	}
 
-	debug("Found %s\n", card->name);
+	infomsg("Found %s device\n", card->name);
 	return card;
 }
 
@@ -551,6 +551,7 @@ bool
 ccid_reader_set_features(ccid_reader_t *reader, const ccid_descriptor_t *ccid)
 {
 	unsigned int f = ccid->dwFeatures;
+	bool auto_atr = false, auto_activate = false, no_pts = false, no_setparam = false;
 
 	if (f & 0x60000) {
 		debug("Reader supports APDU exchange\n");
@@ -559,24 +560,32 @@ ccid_reader_set_features(ccid_reader_t *reader, const ccid_descriptor_t *ccid)
 		return false;
 	}
 
-	printf("Reader features");
-
 	if (ccid->dwFeatures & 0x2)
-		printf(" FLAG_AUTO_ATRPARSE");
+		auto_atr = true;
+
 	if (ccid->dwFeatures & 0x4) {
-		printf(" FLAG_AUTO_ACTIVATE");
+		auto_activate = true;
 		reader->auto_voltage = true;
 	}
 	if (ccid->dwFeatures & 0x8) {
-		printf(" AUTO_VOLTAGE");
 		reader->auto_voltage = true;
 	}
 	if (ccid->dwFeatures & 0x40)
-		printf(" FLAG_NO_PTS FLAG_NO_SETPARAM");
+		no_pts = no_setparam = true;
 	if (ccid->dwFeatures & 0x80)
-		printf(" FLAG_NO_PTS");
+		no_pts = true;
 
+	debug("Reader features %s%s%s%s%s%s\n",
+			auto_atr? " AUTO_ATR" : "",
+			auto_activate? " AUTO_ACTIVATE" : "",
+			reader->auto_voltage? " AUTO_VOLTAGE" : "",
+			no_pts? " NO_PTS" : "",
+			no_setparam? " NO_SETPARAM" : "");
 
-	printf("\n");
+	if (!auto_atr || !no_pts || !no_setparam) {
+		error("This utility cannot handle CCID devices that require PTS or parameter selection\n");
+		return false;
+	}
+
 	return true;
 }

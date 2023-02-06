@@ -66,7 +66,7 @@ usb_parse_type(const char *string, uusb_type_t *type)
 	return true;
 
 bad:
-	fprintf(stderr, "Cannot parse USB vendor:product string \"%s\"\n", string);
+	error("Cannot parse USB vendor:product string \"%s\"\n", string);
 	return false;
 }
 
@@ -78,7 +78,7 @@ usb_find_device(bool (*match_fn)(const char *path, const void *data), const void
 	struct dirent *d;
 
 	if (!(dir = opendir(SYSFS_USB_DEVICES))) {
-		fprintf(stderr, "Cannot open %s: %m\n", SYSFS_USB_DEVICES);
+		error("Cannot open %s: %m\n", SYSFS_USB_DEVICES);
 		return NULL;
 	}
 
@@ -228,7 +228,7 @@ sysfs_get_dev_t(const char *sysfs_dir, const char *name, dev_t *dev_ret)
 	bool ok = false;
 
 	if (!(majmin = sysfs_read_line(sysfs_dir, "dev"))) {
-		fprintf(stderr, "Cannot read %s/dev\n", sysfs_dir);
+		error("Cannot read %s/dev\n", sysfs_dir);
 		return NULL;
 	}
 
@@ -256,7 +256,7 @@ __uusb_attach_device(uusb_dev_t *dev)
 	dev->devaddr.dev = sysfs_read_decimal(dev->sysfs_dir, "devnum");
 
 	if (!sysfs_get_dev_t(dev->sysfs_dir, "dev", &linuxdev)) {
-		fprintf(stderr, "Cannot get dev_t for USB device\n");
+		error("Cannot get dev_t for USB device\n");
 		return false;
 	}
 
@@ -294,27 +294,27 @@ __usb_open(char *sysfs_dir)
 	dev->fd = -1;
 
 	if (!__uusb_attach_device(dev)) {
-		fprintf(stderr, "Cannot attach system device file\n");
+		error("Cannot attach system device file\n");
 		return NULL;
 	}
 
 	if (!__uusb_identify_device(dev)) {
-		fprintf(stderr, "Cannot identify USB device\n");
+		error("Cannot identify USB device\n");
 		return NULL;
 	}
 
 	if (!__uusb_process_descriptors(dev)) {
-		fprintf(stderr, "Error parsing USB descriptors\n");
+		error("Error parsing USB descriptors\n");
 		return NULL;
 	}
 
 	dev->fd = open(dev->dev_path, O_RDWR);
 	if (dev->fd < 0) {
-		fprintf(stderr, "Unable to open %s: %m\n", dev->dev_path);
+		error("Unable to open %s: %m\n", dev->dev_path);
 		return NULL;
 	}
 
-	printf("Opened USB device %04x:%04x at %u:%u; path %s\n",
+	infomsg("Opened USB device %04x:%04x at %u:%u; path %s\n",
 			dev->type.idVendor, dev->type.idProduct,
 			dev->devaddr.bus, dev->devaddr.dev,
 			dev->dev_path);
@@ -343,7 +343,7 @@ uusb_select_interface(uusb_dev_t *dev, const uusb_config_t *config, const uusb_i
 	 *   usb 1-10: usbfs: interface 0 claimed by usbhid while 'uusb' sets config #1
 	 */
 	if (dev->descriptor.bNumConfigurations > 1) {
-		printf("Selecting config %u\n", config_num);
+		usb_debug("Selecting config %u\n", config_num);
 		if (ioctl(dev->fd, USBDEVFS_SETCONFIGURATION, &config_num) < 0) {
 			perror("ioctl(USBDEVFS_SETCONFIGURATION)");
 			return false;
@@ -351,7 +351,7 @@ uusb_select_interface(uusb_dev_t *dev, const uusb_config_t *config, const uusb_i
 	}
 
 	if (interface_num != 0) {
-		printf("Selecting config %u interface %u\n", config_num, interface_num);
+		usb_debug("Selecting config %u interface %u\n", config_num, interface_num);
 		if (ioctl(dev->fd, USBDEVFS_CLAIMINTERFACE, &interface_num) < 0) {
 			perror("ioctl(USBDEVFS_CLAIMINTERFACE)");
 			return false;
@@ -409,7 +409,7 @@ uusb_dev_select_ccid_interface(uusb_dev_t *dev, const struct ccid_descriptor **c
 			if ((ccid = interface->ccid) != NULL
 			 && uusb_set_endpoints(dev, interface)
 			 && uusb_select_interface(dev, config, interface)) {
-				printf("Successfully selected CCID interface\n");
+				infomsg("Successfully selected CCID interface\n");
 				*ccid_ret = ccid;
 				return true;
 			}

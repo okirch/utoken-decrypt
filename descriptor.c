@@ -167,7 +167,7 @@ uusb_interface_process_descriptor(uusb_interface_t *interface, const unsigned ch
 	}
 
 	if (interface->type->handle_descriptor == NULL) {
-		printf("Ignoring %s descriptor for %s interface\n", uusb_dt_type_string(data[1]), interface->type->name);
+		usb_debug("Ignoring %s descriptor for %s interface\n", uusb_dt_type_string(data[1]), interface->type->name);
 		return true;
 	}
 
@@ -189,33 +189,33 @@ uusb_parse_descriptors(uusb_dev_t *dev, const unsigned char *data, size_t len)
 		uusb_dt_parser_t dt;
 
 		if (pos + dt_len > len) {
-			fprintf(stderr, "Bad descriptors (dt at pos %u is too long)\n", pos);
+			error("Bad descriptors (dt at pos %u is too long)\n", pos);
 			return false;
 		}
 
-		printf("%-8s %3u\n", uusb_dt_type_string(dt_type), dt_len);
+		usb_debug("%-8s %3u\n", uusb_dt_type_string(dt_type), dt_len);
 
 		uusb_dt_parser_init(&dt, data + pos, dt_len);
 		if (pos == 0) {
 			if (dt_type != USB_DT_DEVICE) {
-				fprintf(stderr, "Bad descriptors (first descriptor is type %s)\n", uusb_dt_type_string(dt_type));
+				error("Bad descriptors (first descriptor is type %s)\n", uusb_dt_type_string(dt_type));
 				return false;
 			}
 			if (!__uusb_parse_device_descriptor(&dt, &dev->descriptor))
 				return false;
 
 			if (dev->descriptor.bNumConfigurations == 0 || dev->descriptor.bNumConfigurations > UUSB_MAX_CONFIGS) {
-				fprintf(stderr, "Cannot handle device with %u configurations\n", dev->descriptor.bNumConfigurations);
+				error("Cannot handle device with %u configurations\n", dev->descriptor.bNumConfigurations);
 				return false;
 			}
 		} else {
 			switch (dt_type) {
 			case USB_DT_DEVICE:
-				fprintf(stderr, "Bad descriptors (duplicate device descriptor)\n");
+				error("Bad descriptors (duplicate device descriptor)\n");
 				return false;
 			case USB_DT_CONFIG:
 				if (dev->num_configs > dev->descriptor.bNumConfigurations) {
-					fprintf(stderr, "Too many config descriptors\n");
+					error("Too many config descriptors\n");
 					return false;
 				}
 
@@ -226,12 +226,12 @@ uusb_parse_descriptors(uusb_dev_t *dev, const unsigned char *data, size_t len)
 				break;
 			case USB_DT_INTERFACE:
 				if (config == NULL) {
-					fprintf(stderr, "Interface descriptor precedes first config descriptor\n");
+					error("Interface descriptor precedes first config descriptor\n");
 					return false;
 				}
 
 				if (config->num_interfaces > config->descriptor.bNumInterfaces) {
-					fprintf(stderr, "Too many interface descriptors\n");
+					error("Too many interface descriptors\n");
 					return false;
 				}
 
@@ -241,7 +241,7 @@ uusb_parse_descriptors(uusb_dev_t *dev, const unsigned char *data, size_t len)
 
 				interface->type = uusb_find_interface_type(&interface->descriptor.bInterface);
 				if (interface->type == NULL)
-					printf("Interface for unknown class %u/subclass %u/protocol %u\n",
+					usb_debug("Interface for unknown class %u/subclass %u/protocol %u\n",
 							interface->descriptor.bInterface.class,
 							interface->descriptor.bInterface.subclass,
 							interface->descriptor.bInterface.protocol);
@@ -249,12 +249,12 @@ uusb_parse_descriptors(uusb_dev_t *dev, const unsigned char *data, size_t len)
 
 			case USB_DT_ENDPOINT:
 				if (interface == NULL) {
-					fprintf(stderr, "Endpoint descriptor precedes first interface descriptor\n");
+					error("Endpoint descriptor precedes first interface descriptor\n");
 					return false;
 				}
 
 				if (interface->num_endpoints > interface->descriptor.bNumEndpoints) {
-					fprintf(stderr, "Too many endpoint descriptors\n");
+					error("Too many endpoint descriptors\n");
 					return false;
 				}
 
@@ -272,11 +272,6 @@ uusb_parse_descriptors(uusb_dev_t *dev, const unsigned char *data, size_t len)
 			}
 		}
 	}
-
-	if (dev->type.idVendor != dev->descriptor.idVendor)
-		printf("vendor mismatch %04x vs %04x\n", dev->type.idVendor, dev->descriptor.idVendor);
-	if (dev->type.idProduct != dev->descriptor.idProduct)
-		printf("product mismatch %04x vs %04x\n", dev->type.idProduct, dev->descriptor.idProduct);
 
 	return true;
 }
