@@ -156,16 +156,11 @@ yubikey_connect(ifd_card_t *card)
 	if (card->yubikey.key_slot == 0)
 		card->yubikey.key_slot = 0x9e;
 
-	if (card->yubikey.key_slot == 0x9e) {
-		debug("PIV card slot does not require a PIN\n");
+	debug("Trying empty password to see whether a PIN is required\n");
+	if (yubikey_verify(card, NULL, 0, NULL))
 		card->pin_required = false;
-	} else {
-		debug("Trying PIN password to see whether a PIN is required\n");
-		if (yubikey_verify(card, NULL, 0, NULL))
-			card->pin_required = false;
-		else
-			debug("This card requires a PIN\n");
-	}
+	else
+		debug("This card has a PIN.\n");
 
 	return true;
 }
@@ -394,9 +389,17 @@ yubikey_decipher(ifd_card_t *card, buffer_t *ciphertext)
 		if (rapdu == NULL) {
 			error("Failed to decipher: communication error\n");
 			goto done;
-		} else if (sw != YKPIV_SUCCESS) {
-			error("Failed to decipher: card reports status %04x\n", sw);
-			goto done;
+		} else {
+			switch (sw) {
+			case YKPIV_SUCCESS:
+				break;
+			case YKPIV_ERR_SECURITY_STATUS:
+				error("To use this key, you have to present a valid PIN first\n");
+				goto done;
+			default:
+				error("Failed to decipher: card reports status %04x\n", sw);
+				goto done;
+			}
 		}
 
 		buffer_skip(data, len);
@@ -405,7 +408,7 @@ yubikey_decipher(ifd_card_t *card, buffer_t *ciphertext)
 	if (!yubikey_decode_decipher_resp(rapdu))
 		goto done;
 
-	/* The response APDU should now contain the padded secret. We expect pkcs1 2 padding */
+	/* The response APDU should now contain the padded secret. We expect pkcs1 type 2 padding */
 	if (pkcs1_type2_padding_remove(rapdu)) {
 		cleartext = rapdu;
 		rapdu = NULL;

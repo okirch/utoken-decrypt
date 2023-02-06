@@ -47,6 +47,10 @@ typedef struct ifd_card {
 
 	ccid_reader_t *		reader;
 	unsigned int		slot;
+
+	/* If the card has an application level PIN, set to true.
+	 * It's still possible, though, that a given key can be used without
+	 * presenting the application PIN. */
 	bool			pin_required;
 
 	union {

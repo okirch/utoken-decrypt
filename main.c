@@ -175,13 +175,8 @@ doit(uusb_dev_t *dev, const char *pin, buffer_t *ciphertext, unsigned int ncardo
 	if (!ifd_card_connect(card))
 		return NULL;
 
-	if (card->pin_required) {
+	if (pin != NULL) {
 		unsigned int retries_left;
-
-		if (pin == NULL) {
-			error("This card requires a PIN\n");
-			return NULL;
-		}
 
 		if (!ifd_card_verify(card, pin, strlen(pin), &retries_left)) {
 			error("Wrong PIN, %u attempts left\n", retries_left);
