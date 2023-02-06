@@ -29,6 +29,7 @@
 buffer_t *
 buffer_read_file(const char *filename, int flags)
 {
+	const char *display_name = filename;
 	bool closeit = true;
 	buffer_t *bp;
 	struct stat stb;
@@ -36,6 +37,7 @@ buffer_read_file(const char *filename, int flags)
 	int fd;
 
 	if (filename == NULL || !strcmp(filename, "-")) {
+		display_name = "<stdin>";
 		closeit = false;
 		fd = 0;
 	} else
@@ -44,25 +46,25 @@ buffer_read_file(const char *filename, int flags)
 	}
 
 	if (fstat(fd, &stb) < 0)
-		fatal("Cannot stat %s: %m\n", filename);
+		fatal("Cannot stat %s: %m\n", display_name);
 
 	bp = buffer_alloc_write(stb.st_size);
 	if (bp == NULL)
 		fatal("Cannot allocate buffer of %lu bytes for %s: %m\n",
 				(unsigned long) stb.st_size,
-				filename);
+				display_name);
 
 	count = read(fd, bp->data, stb.st_size);
 	if (count < 0)
-		fatal("Error while reading from %s: %m\n", filename);
+		fatal("Error while reading from %s: %m\n", display_name);
 
 	if (count != stb.st_size)
-		fatal("Short read from %s\n", filename);
+		fatal("Short read from %s\n", display_name);
 
 	if (closeit)
 		close(fd);
 
-	debug2("Read %u bytes from %s\n", count, filename);
+	debug("Read %u bytes from %s\n", count, display_name);
 	bp->wpos = count;
 	return bp;
 }
@@ -70,22 +72,24 @@ buffer_read_file(const char *filename, int flags)
 bool
 buffer_write_file(const char *filename, buffer_t *bp)
 {
+	const char *display_name = filename;
 	unsigned int written = 0;
 	int fd, n;
 	bool closeit = true;
 
 	if (filename == NULL || !strcmp(filename, "-")) {
+		display_name = "<stdout>";
 		closeit = false;
 		fd = 1;
 	} else
 	if ((fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644)) < 0) {
-		fatal("Unable to open file %s: %m\n", filename);
+		fatal("Unable to open file %s: %m\n", display_name);
 	}
 
 	while ((n = buffer_available(bp)) != 0) {
 		n = write(fd, buffer_read_pointer(bp), n);
 		if (n < 0)
-			fatal("write error on %s: %m\n", filename);
+			fatal("write error on %s: %m\n", display_name);
 
 		buffer_skip(bp, n);
 		written += n;
@@ -94,6 +98,6 @@ buffer_write_file(const char *filename, buffer_t *bp)
 	if (closeit)
 		close(fd);
 
-	debug2("Wrote %u bytes to %s\n", written, filename);
+	debug("Wrote %u bytes to %s\n", written, display_name);
 	return true;
 }
