@@ -32,6 +32,7 @@ static struct option	options[] = {
 	{ "device",	required_argument,	NULL,	'D' },
 	{ "type",	required_argument,	NULL,	'T' },
 	{ "pin",	required_argument,	NULL,	'p' },
+	{ "output",	required_argument,	NULL,	'o' },
 	{ "debug",	no_argument,		NULL,	'd' },
 	{ "help",	no_argument,		NULL,	'h' },
 	{ NULL }
@@ -39,8 +40,8 @@ static struct option	options[] = {
 
 unsigned int	opt_debug = 0;
 
-static buffer_t *read_data(const char *filename);
-static bool	doit(uusb_dev_t *dev, const char *pin, buffer_t *secret);
+static buffer_t *	read_data(const char *filename);
+static buffer_t *	doit(uusb_dev_t *dev, const char *pin, buffer_t *secret);
 
 int
 main(int argc, char **argv)
@@ -48,11 +49,13 @@ main(int argc, char **argv)
 	char *opt_device = NULL;
 	char *opt_type = NULL;
 	char *opt_pin = NULL;
+	char *opt_output = NULL;
 	buffer_t *secret;
 	uusb_dev_t *dev;
+	buffer_t *cleartext;
 	int c;
 
-	while ((c = getopt_long(argc, argv, "dhD:T:p:", options, NULL)) != -1) {
+	while ((c = getopt_long(argc, argv, "dhD:T:p:o:", options, NULL)) != -1) {
 		switch (c) {
 		case 'h':
 			printf("Sorry, no help message. Please refer to the README.\n");
@@ -72,6 +75,10 @@ main(int argc, char **argv)
 
 		case 'p':
 			opt_pin = optarg;
+			break;
+
+		case 'o':
+			opt_output = optarg;
 			break;
 
 		default:
@@ -105,7 +112,14 @@ main(int argc, char **argv)
 
 	yubikey_init();
 
-	return !doit(dev, opt_pin, secret);
+	if (!(cleartext = doit(dev, opt_pin, secret)))
+		return 1;
+
+	if (!buffer_write_file(opt_output, cleartext))
+		return 1;
+
+	buffer_free(cleartext);
+	return 0;
 }
 
 static buffer_t *
@@ -115,7 +129,7 @@ read_data(const char *filename)
 	return buffer_read_file(filename, 0);
 }
 
-bool
+buffer_t *
 doit(uusb_dev_t *dev, const char *pin, buffer_t *ciphertext)
 {
 	ccid_reader_t *reader;
@@ -124,30 +138,30 @@ doit(uusb_dev_t *dev, const char *pin, buffer_t *ciphertext)
 
 	if (!(reader = ccid_reader_create(dev))) {
 		error("Unable to create reader for USB device\n");
-		return false;
+		return NULL;
 	}
 
 	if (!ccid_reader_select_slot(reader, 0))
-		return false;
+		return NULL;
 
 	card = ccid_reader_identify_card(reader, 0);
 	if (card == NULL)
-		return false;
+		return NULL;
 
 	if (!ifd_card_connect(card))
-		return false;
+		return NULL;
 
 	if (card->pin_required) {
 		unsigned int retries_left;
 
 		if (pin == NULL) {
 			error("This card requires a PIN\n");
-			return false;
+			return NULL;
 		}
 
 		if (!ifd_card_verify(card, pin, strlen(pin), &retries_left)) {
 			error("Wrong PIN, %u attempts left\n", retries_left);
-			return false;
+			return NULL;
 		}
 
 		infomsg("Successfully verified PIN.\n");
@@ -156,8 +170,8 @@ doit(uusb_dev_t *dev, const char *pin, buffer_t *ciphertext)
 	cleartext = ifd_card_decipher(card, ciphertext);
 	if (cleartext == NULL) {
 		error("Card failed to decrypt secret\n");
-		return false;
+		return NULL;
 	}
 
-	return true;
+	return cleartext;
 }
