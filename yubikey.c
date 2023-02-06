@@ -125,11 +125,6 @@ yubikey_connect(ifd_card_t *card)
 
 	infomsg("Successfully selected PIV application\n");
 
-#if 0
-	/* try to select t=1 */
-	ccid_reader_select_protocol(card->reader, card->slot, 1);
-#endif
-
 	debug("Trying PIN password to see whether a PIN is required\n");
 	if (yubikey_verify(card, NULL, 0, NULL))
 		card->pin_required = false;

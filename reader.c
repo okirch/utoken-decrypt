@@ -448,6 +448,7 @@ ccid_reader_identify_card(ccid_reader_t *reader, unsigned int slot)
 	return card;
 }
 
+#ifdef NOT_NEEDED
 static int
 ccid_reader_getparams(ccid_reader_t *reader, unsigned int slot, unsigned char *parambuf, unsigned int size)
 {
@@ -518,6 +519,7 @@ ccid_reader_select_protocol(ccid_reader_t *reader, unsigned int slot, unsigned i
 
 	return ccid_reader_setparams(reader, slot, t, parambuf, len);
 }
+#endif
 
 buffer_t *
 ccid_reader_apdu_xfer(ccid_reader_t *reader, unsigned int slot, buffer_t *apdu)
