@@ -40,7 +40,6 @@ static struct option	options[] = {
 
 unsigned int	opt_debug = 0;
 
-static buffer_t *	read_data(const char *filename);
 static buffer_t *	doit(uusb_dev_t *dev, const char *pin, buffer_t *secret);
 
 int
@@ -49,6 +48,7 @@ main(int argc, char **argv)
 	char *opt_device = NULL;
 	char *opt_type = NULL;
 	char *opt_pin = NULL;
+	char *opt_input = NULL;
 	char *opt_output = NULL;
 	buffer_t *secret;
 	uusb_dev_t *dev;
@@ -87,12 +87,20 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (optind != argc - 1) {
-		error("Expected exactly one non-positional argument\n");
+	if (optind == argc) {
+		opt_input = "-";
+		infomsg("Reading data from standard input\n");
+	} else {
+		opt_input = argv[optind++];
+		infomsg("Reading data from \"%s\"\n", opt_input);
+	}
+
+	if (optind != argc) {
+		error("Expected at most one non-positional argument\n");
 		return 1;
 	}
 
-	secret = read_data(argv[optind++]);
+	secret = buffer_read_file(opt_input, 0);
 
 	(void) opt_device;
 
@@ -115,18 +123,12 @@ main(int argc, char **argv)
 	if (!(cleartext = doit(dev, opt_pin, secret)))
 		return 1;
 
+	infomsg("Writing data to \"%s\"\n", opt_output?: "<stdout>");
 	if (!buffer_write_file(opt_output, cleartext))
 		return 1;
 
 	buffer_free(cleartext);
 	return 0;
-}
-
-static buffer_t *
-read_data(const char *filename)
-{
-	infomsg("Reading data from \"%s\"\n", filename);
-	return buffer_read_file(filename, 0);
 }
 
 buffer_t *
