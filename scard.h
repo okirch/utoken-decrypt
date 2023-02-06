@@ -33,6 +33,7 @@ typedef struct ifd_atrbuf {
 } ifd_atrbuf_t;
 
 typedef struct ifd_card_driver {
+	bool			(*set_option)(ifd_card_t *, const char *key, const char *value);
 	bool			(*connect)(ifd_card_t *);
 	bool			(*verify)(ifd_card_t *, const char *pin, size_t pin_len, unsigned int *tries_left);
 	buffer_t * 		(*decipher)(ifd_card_t *, buffer_t *ciphertext);
@@ -47,6 +48,12 @@ typedef struct ifd_card {
 	ccid_reader_t *		reader;
 	unsigned int		slot;
 	bool			pin_required;
+
+	union {
+		struct {
+			unsigned char	key_slot;
+		} yubikey;
+	};
 } ifd_card_t;
 
 extern void		yubikey_init(void);
@@ -54,6 +61,7 @@ extern void		yubikey_init(void);
 extern void		ifd_atrbuf_set(ifd_atrbuf_t *, const void *, size_t len);
 extern void		ifd_register_card_driver(const ifd_atrbuf_t *, const char *name, ifd_card_driver_t *, int variant);
 extern ifd_card_t *	ifd_create_card(const ifd_atrbuf_t *, ccid_reader_t *, unsigned int slot);
+extern bool		ifd_card_set_option(ifd_card_t *, const char *);
 extern bool		ifd_card_connect(ifd_card_t *);
 extern buffer_t *	ifd_card_xfer(ifd_card_t *card, buffer_t *apdu, uint16_t *sw);
 extern bool		ifd_card_verify(ifd_card_t *, const char *pin, size_t pin_len, unsigned int *tries_left);

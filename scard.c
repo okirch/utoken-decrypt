@@ -136,6 +136,32 @@ ifd_create_card(const ifd_atrbuf_t *atr, ccid_reader_t *reader, unsigned int slo
 }
 
 bool
+ifd_card_set_option(ifd_card_t *card, const char *option)
+{
+	char *copy, *key, *value;
+	bool ok = false;
+
+	if (card->driver->set_option == NULL) {
+		error("Card driver does not support any card options\n");
+		return false;
+	}
+
+	copy = key = strdup(option);
+	if ((value = strchr(copy, '=')) != NULL)
+		*value++ = '\0';
+
+	ok = card->driver->set_option(card, key, value);
+	free(copy);
+
+	if (!ok) {
+		error("Unable to set card option \"%s\"\n", option);
+		return false;
+	}
+
+	return true;
+}
+
+bool
 ifd_card_connect(ifd_card_t *card)
 {
 	if (card->driver->connect == NULL)

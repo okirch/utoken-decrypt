@@ -33,6 +33,7 @@ static struct option	options[] = {
 	{ "type",	required_argument,	NULL,	'T' },
 	{ "pin",	required_argument,	NULL,	'p' },
 	{ "output",	required_argument,	NULL,	'o' },
+	{ "card-option",required_argument,	NULL,	'C' },
 	{ "debug",	no_argument,		NULL,	'd' },
 	{ "help",	no_argument,		NULL,	'h' },
 	{ NULL }
@@ -40,7 +41,9 @@ static struct option	options[] = {
 
 unsigned int	opt_debug = 0;
 
-static buffer_t *	doit(uusb_dev_t *dev, const char *pin, buffer_t *secret);
+static buffer_t *	doit(uusb_dev_t *dev, const char *pin, buffer_t *secret, unsigned int ncardopts, char **cardopts);
+
+#define MAX_CARDOPTS	16
 
 int
 main(int argc, char **argv)
@@ -50,12 +53,14 @@ main(int argc, char **argv)
 	char *opt_pin = NULL;
 	char *opt_input = NULL;
 	char *opt_output = NULL;
+	char *cardopts[MAX_CARDOPTS];
+	unsigned int ncardopts = 0;
 	buffer_t *secret;
 	uusb_dev_t *dev;
 	buffer_t *cleartext;
 	int c;
 
-	while ((c = getopt_long(argc, argv, "dhD:T:p:o:", options, NULL)) != -1) {
+	while ((c = getopt_long(argc, argv, "dhC:D:T:p:o:", options, NULL)) != -1) {
 		switch (c) {
 		case 'h':
 			printf("Sorry, no help message. Please refer to the README.\n");
@@ -63,6 +68,15 @@ main(int argc, char **argv)
 
 		case 'd':
 			opt_debug++;
+			break;
+
+		case 'C':
+			if (ncardopts >= MAX_CARDOPTS) {
+				error("Too many card options\n");
+				return 1;
+			}
+
+			cardopts[ncardopts++] = optarg;
 			break;
 
 		case 'D':
@@ -120,7 +134,7 @@ main(int argc, char **argv)
 
 	yubikey_init();
 
-	if (!(cleartext = doit(dev, opt_pin, secret)))
+	if (!(cleartext = doit(dev, opt_pin, secret, ncardopts, cardopts)))
 		return 1;
 
 	infomsg("Writing data to \"%s\"\n", opt_output?: "<stdout>");
@@ -132,7 +146,7 @@ main(int argc, char **argv)
 }
 
 buffer_t *
-doit(uusb_dev_t *dev, const char *pin, buffer_t *ciphertext)
+doit(uusb_dev_t *dev, const char *pin, buffer_t *ciphertext, unsigned int ncardopts, char **cardopts)
 {
 	ccid_reader_t *reader;
 	ifd_card_t *card;
@@ -149,6 +163,14 @@ doit(uusb_dev_t *dev, const char *pin, buffer_t *ciphertext)
 	card = ccid_reader_identify_card(reader, 0);
 	if (card == NULL)
 		return NULL;
+
+	if (ncardopts) {
+		unsigned int i;
+		for (i = 0; i < ncardopts; ++i) {
+			if (!ifd_card_set_option(card, cardopts[i]))
+				return NULL;
+		}
+	}
 
 	if (!ifd_card_connect(card))
 		return NULL;

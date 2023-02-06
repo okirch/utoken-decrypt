@@ -63,11 +63,13 @@ enum {
 	YK_VARIANT_YUBIKEY_5_P1,
 };
 
+static bool		yubikey_set_card_option(ifd_card_t *card, const char *key, const char *value);
 static bool		yubikey_connect(ifd_card_t *card);
 static bool		yubikey_verify(ifd_card_t *card, const char *pin, size_t pin_len, unsigned int *tries_left);
 static buffer_t *	yubikey_decipher(ifd_card_t *card, buffer_t *ciphertext);
 
 static ifd_card_driver_t	yubikey_driver = {
+	.set_option	= yubikey_set_card_option,
 	.connect	= yubikey_connect,
 	.verify		= yubikey_verify,
 	.decipher	= yubikey_decipher,
@@ -114,6 +116,26 @@ done:
 }
 
 bool
+yubikey_set_card_option(ifd_card_t *card, const char *key, const char *value)
+{
+	if (!strcmp(key, "key-slot") && value) {
+		unsigned int key_slot;
+		char *end;
+
+		key_slot = strtoul(value, &end, 16);
+		if (*end)
+			return false;
+
+		if (key_slot == 0 || key_slot >= 0xFF)
+			return false;
+
+		card->yubikey.key_slot = key_slot;
+		return true;
+	}
+	return false;
+}
+
+bool
 yubikey_connect(ifd_card_t *card)
 {
 	static unsigned const char piv_aid[] = { 0xa0, 0x00, 0x00, 0x03, 0x08 };
@@ -125,11 +147,25 @@ yubikey_connect(ifd_card_t *card)
 
 	infomsg("Successfully selected PIV application\n");
 
-	debug("Trying PIN password to see whether a PIN is required\n");
-	if (yubikey_verify(card, NULL, 0, NULL))
+	/* Select an appropriate PIV key slot.
+	 * 9a: PIV Authentication, pin required
+	 * 9e: Card Authentication, no pin required
+	 * 82-95: nominally, for retired key management, but could also be
+	 *	abused for FDE.
+	 */
+	if (card->yubikey.key_slot == 0)
+		card->yubikey.key_slot = 0x9e;
+
+	if (card->yubikey.key_slot == 0x9e) {
+		debug("PIV card slot does not require a PIN\n");
 		card->pin_required = false;
-	else
-		debug("This card requires a PIN\n");
+	} else {
+		debug("Trying PIN password to see whether a PIN is required\n");
+		if (yubikey_verify(card, NULL, 0, NULL))
+			card->pin_required = false;
+		else
+			debug("This card requires a PIN\n");
+	}
 
 	return true;
 }
@@ -309,7 +345,7 @@ pkcs1_type2_padding_remove(buffer_t *bp)
 static buffer_t *
 yubikey_decipher(ifd_card_t *card, buffer_t *ciphertext)
 {
-	unsigned int key = 0x9a;	/* for now, assume we're always using slot 9a. */
+	unsigned int key = card->yubikey.key_slot;
 	unsigned int in_len;
 	uint8_t algorithm;
 	buffer_t *data, *apdu = NULL, *rapdu = NULL, *cleartext = NULL;
