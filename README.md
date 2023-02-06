@@ -45,18 +45,18 @@ and encrypt it with the public key:
 
 To decrypt the secret using your yubikey:
 
-	utoken-decrypt -T 1050 -p 123456 secret
+	utoken-decrypt -T 1050 -p 123456 secret -o recovered
 
 The -T option tells it to look for a USB device manufactured by yubico (USB vendor
 ID 1050 - you could be more specific and look for vendor:product id).
 
 The -p option provides the PIN. If you haven't changed it, the default is 123456.
-For now, this will print a lot of debugging messages, but it should eventually
-display a hex dump of the data it recovered - which should match your "secret"
-input.
+
+The -o option tells it where to write the recovered secret to. If you omit this,
+data will be written to stdout (note that all informational and debug messages
+are written to stderr, so there should be no risk of these outputs getting mixed up).
 
 ## Things to be done
 
-Currently, the code just proves that it can be done. It's still a terrible mess,
-and needs a fair amount of clean-up. Plus packaging. And then porting to make it
-usable in grub.
+This code still needs a bit of love and clean-up. Plus packaging. And
+then porting to make it usable in grub.
